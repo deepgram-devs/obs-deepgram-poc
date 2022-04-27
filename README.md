@@ -1,4 +1,10 @@
-## Instructions for macOS (Catalina)
+# obs-deepgram-poc
+
+A proof-of-concept OBS Studio plugin which adds a Deepgram Source.
+A Deepgram Source takes a Deepgram API Key and an Audio Source as its configuration,
+and displays live English transcripts in a Text Source.
+
+## Build Instructions for macOS
 
 Pre-requisites:
 * Homebrew (https://brew.sh)
@@ -31,7 +37,7 @@ cd plugins
 Checkout the `obs-deepgram-poc` repo and init its submodules:
 
 ```
-git clone git@github.com:nikoladg/obs-deepgram-poc.git
+git clone git@github.com:deepgram-devs/obs-deepgram-poc.git
 cd obs-deepgram-poc
 git submodule update --init --recursive
 ```
