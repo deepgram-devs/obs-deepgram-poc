@@ -10,6 +10,8 @@
 
 #include "WebsocketEndpoint.hpp"
 
+#define CHARACTERS_PER_LINE 80
+
 // TODO: there are memory leaks
 
 // TODO: consider using buttons for "start" and "stop"
@@ -274,7 +276,14 @@ static void deepgram_source_tick(void *data, float seconds)
 					dgsd->transcript += " ";
 				}
 				if (transcript != "") {
-					dgsd->transcript += transcript;
+					std::string combined =
+						dgsd->transcript + transcript;
+					if (combined.length() <
+					    CHARACTERS_PER_LINE) {
+						dgsd->transcript = combined;
+					} else {
+						dgsd->transcript = transcript;
+					}
 				}
 			}
 		}
