@@ -1,4 +1,5 @@
 #include <obs-module.h>
+#include <obs-frontend-api.h>
 
 #include <nlohmann/json.hpp>
 
@@ -284,15 +285,27 @@ static void deepgram_source_tick(void *data, float seconds)
 					} else {
 						dgsd->transcript = transcript;
 					}
+
+					// NOTE: there were many more memory leaks when this was outside these conditionals
+					// I can see why this was outside of the loop - should implement some "if new_transcript != old_transcript" logic
+					obs_data_t *text_source_settings =
+						obs_source_get_settings(
+							dgsd->text_source);
+					obs_data_set_string(
+						text_source_settings, "text",
+						dgsd->transcript.c_str());
+					obs_source_update(dgsd->text_source,
+							  text_source_settings);
+
+					blog(LOG_INFO,
+					     "Calling obs_output_output_caption_text2 with: %s",
+					     dgsd->transcript.c_str());
+					obs_output_output_caption_text2(
+						obs_frontend_get_streaming_output(),
+						dgsd->transcript.c_str(), 0.0);
 				}
 			}
 		}
-
-		obs_data_t *text_source_settings =
-			obs_source_get_settings(dgsd->text_source);
-		obs_data_set_string(text_source_settings, "text",
-				    dgsd->transcript.c_str());
-		obs_source_update(dgsd->text_source, text_source_settings);
 	}
 }
 

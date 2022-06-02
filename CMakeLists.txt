@@ -36,6 +36,7 @@ add_library(obs-deepgram-poc MODULE
 
 target_link_libraries(obs-deepgram-poc
       libobs
+      obs-frontend-api
       "${OPENSSL_LIBRARIES}"
       )
 
