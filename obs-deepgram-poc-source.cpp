@@ -12,8 +12,6 @@
 
 #define CHARACTERS_PER_LINE 80
 
-// TODO: there are memory leaks
-
 // TODO: consider using buttons for "start" and "stop"
 
 // TODO: turn this into a class/object - the aja plugin is a nice reference
@@ -28,6 +26,8 @@ struct deepgram_source_data {
 	std::string audio_source_name;
 	// the text source and transcript to display in it
 	obs_source_t *text_source;
+	obs_data_t *text_source_settings;
+	obs_data_t *font_obj;
 	std::string transcript;
 };
 
@@ -82,6 +82,7 @@ static void deepgram_source_update(void *data, obs_data_t *settings)
 	blog(LOG_INFO, "Running deepgram_source_update.");
 
 	struct deepgram_source_data *dgsd = (deepgram_source_data *)data;
+
 	const char *audio_source_name =
 		obs_data_get_string(settings, "audio_source_name");
 	const char *api_key = obs_data_get_string(settings, "api_key");
@@ -102,6 +103,7 @@ static void deepgram_source_update(void *data, obs_data_t *settings)
 		// we will set up a new websocket object and audio capture callback
 		dgsd->audio_source_name = audio_source_name;
 		dgsd->api_key = api_key;
+
 		if (audio_source_name != "none" && api_key != "") {
 			blog(LOG_INFO,
 			     "The audio source changed and we have an API Key, so we will try to connect to Deepgram and setup an audio callback.");
@@ -116,6 +118,8 @@ static void deepgram_source_update(void *data, obs_data_t *settings)
 			dgsd->endpoint_id = endpoint_id;
 
 			// set up the audio capture callback
+			// NOTE: anything grabbed via "obs_get_source_by_name" needs to be released via "obs_source_release"
+			// as they are essentially reference counted
 			obs_source_t *audio_source =
 				obs_get_source_by_name(audio_source_name);
 			dgsd->audio_source = audio_source;
@@ -132,6 +136,7 @@ static void *deepgram_source_create(obs_data_t *settings, obs_source_t *source)
 	struct deepgram_source_data *dgsd = (deepgram_source_data *)bzalloc(
 		sizeof(struct deepgram_source_data));
 	dgsd->context = source;
+
 	dgsd->audio_source_name = "none";
 	dgsd->api_key = "";
 	dgsd->endpoint = NULL;
@@ -148,12 +153,13 @@ static void *deepgram_source_create(obs_data_t *settings, obs_source_t *source)
 	obs_source_add_active_child(dgsd->context, dgsd->text_source);
 
 	// set up some defaults for this new text source
-	obs_data_t *text_source_settings =
-		obs_source_get_settings(dgsd->text_source);
-	obs_data_set_string(text_source_settings, "text", "transcript...");
-	obs_data_t *font_obj = obs_data_get_obj(text_source_settings, "font");
-	obs_data_set_int(font_obj, "size", 256);
-	obs_source_update(dgsd->text_source, text_source_settings);
+	// NOTE: whenever using "obs_data_get_obj" we will need to release/free with "obs_data_release"
+	dgsd->text_source_settings = obs_source_get_settings(dgsd->text_source);
+	obs_data_set_string(dgsd->text_source_settings, "text",
+			    "transcript...");
+	dgsd->font_obj = obs_data_get_obj(dgsd->text_source_settings, "font");
+	obs_data_set_int(dgsd->font_obj, "size", 256);
+	obs_source_update(dgsd->text_source, dgsd->text_source_settings);
 
 	deepgram_source_update(dgsd, settings);
 
@@ -170,6 +176,7 @@ static void deepgram_source_destroy(void *data)
 	if (dgsd->audio_source != NULL) {
 		obs_source_remove_audio_capture_callback(dgsd->audio_source,
 							 audio_capture, dgsd);
+		obs_source_release(dgsd->audio_source);
 	}
 
 	// if there is a websocket object present, we will remove it
@@ -180,6 +187,9 @@ static void deepgram_source_destroy(void *data)
 	obs_source_remove(dgsd->text_source);
 	obs_source_release(dgsd->text_source);
 	dgsd->text_source = NULL;
+
+	obs_data_release(dgsd->font_obj);
+	obs_data_release(dgsd->text_source_settings);
 
 	bfree(dgsd);
 }
@@ -233,6 +243,7 @@ static obs_properties_t *deepgram_source_properties(void *data)
 
 	struct deepgram_source_data *dgsd = (deepgram_source_data *)data;
 	obs_properties_t *properties = obs_properties_create();
+
 	// instead of starting with these text properties, try adding them later with "obs_properties_add_group"
 	//obs_properties_t *properties = obs_source_properties(dgsd->text_source);
 
@@ -287,12 +298,10 @@ static void deepgram_source_tick(void *data, float seconds)
 				}
 			}
 		}
-
-		obs_data_t *text_source_settings =
-			obs_source_get_settings(dgsd->text_source);
-		obs_data_set_string(text_source_settings, "text",
+		obs_data_set_string(dgsd->text_source_settings, "text",
 				    dgsd->transcript.c_str());
-		obs_source_update(dgsd->text_source, text_source_settings);
+		obs_source_update(dgsd->text_source,
+				  dgsd->text_source_settings);
 	}
 }
 
